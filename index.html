@@ -91,6 +91,10 @@ select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(
 .x{border:0;background:transparent;color:var(--muted);font:inherit;font-size:1.1rem;cursor:pointer;padding:6px 10px;border-radius:8px;min-width:44px;min-height:44px}
 .x.armed{background:var(--owe);color:#fff;font-size:.85rem;font-weight:600}
 .empty{color:var(--muted);font-size:.92rem;margin:0}
+[hidden]{display:none!important}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:600;overflow-wrap:anywhere;background:var(--bg);
+  border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;user-select:all;-webkit-user-select:all}
+.status .ghost{margin-top:10px;font-size:.85rem}
 .totals{display:flex;gap:18px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-bottom:10px}
 .totals b{color:var(--ink);font-variant-numeric:tabular-nums}
 .status{font-size:.8rem;color:var(--muted);margin-top:8px;text-align:center}
@@ -99,7 +103,7 @@ select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(
 .toast.show{opacity:1}
 dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);padding:18px;max-width:340px;width:calc(100% - 32px)}
 dialog::backdrop{background:rgba(0,0,0,.4)}
-dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+dialog .btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
 </head>
@@ -107,6 +111,18 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 <div class="wrap">
   <h1>Kids' ledger</h1>
   <div class="kids" id="kids" role="group" aria-label="Choose a kid"></div>
+
+  <section class="card" id="share" style="margin-top:18px" hidden>
+    <h2>Share one ledger</h2>
+    <p class="empty">Everyone with your family code sees the same ledger, updated live.</p>
+    <button class="primary" id="shareNew">Start a new shared ledger</button>
+    <label for="shareCode" style="margin-top:18px">Already have a family code?</label>
+    <div class="payrow" style="margin-top:0">
+      <input id="shareCode" type="text" placeholder="Paste the code" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <button class="primary" id="shareJoin">Join</button>
+    </div>
+    <div class="err" id="shareErr"></div>
+  </section>
 
   <section class="card" id="first" style="margin-top:18px" hidden>
     <h2>Start your ledger</h2>
@@ -155,7 +171,10 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   </section>
   </div>
 
-  <div class="status" id="status">Loading…</div>
+  <div class="status">
+    <div id="status">Loading…</div>
+    <button class="ghost" id="codeBtn" hidden>Family code</button>
+  </div>
 </div>
 
 <dialog id="kidDlg">
@@ -167,7 +186,20 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   </div>
 </dialog>
 
+<dialog id="codeDlg">
+  <label>Family code</label>
+  <div class="code" id="codeText"></div>
+  <p class="empty">On the other phone, open this app and paste the code under "Already have a family code?". Anyone with the code can see and change the ledger.</p>
+  <div class="btns">
+    <button class="ghost" id="codeLeave">Leave on this phone</button>
+    <button class="ghost" id="codeClose">Close</button>
+    <button class="primary" style="width:auto;margin:0;padding:10px 16px" id="codeShare">Share code</button>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status"></div>
+
+<script src="firebase-config.js"></script>
 
 <script>
 (function(){
@@ -182,6 +214,7 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   let current = kids[0];
   let paidBy = 'own';
   let store = null;          // backend adapter
+  let gate = 'loading';      // '' once the ledger is showing, 'share' while choosing a shared ledger
 
   // ---------- storage adapters ----------
   const LS_KEY = 'kids-ledger-v1';
@@ -190,7 +223,7 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
       mode:'local',
       async load(){
         try{ const raw = localStorage.getItem(LS_KEY); if(raw){ const d=JSON.parse(raw); kids=d.kids||kids; entries=d.entries||[]; } }catch(e){}
-        adoptKids(); render();
+        gate=''; adoptKids(); render();
       },
       async saveKids(){ persistLocal(); },
       async addEntry(e){ entries.push(e); persistLocal(); render(); },
@@ -199,19 +232,19 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
     function persistLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({kids,entries})); }catch(e){} }
   }
 
-  function dbAdapter(db){
-    const kidsRef = db.doc('ledger/kids');
-    const col = db.collection('entries');
+  function dbAdapter(kidsRef, col){
+    let got = 0;
+    const loaded = n => { got |= n; if(got===3 && gate==='loading') gate=''; adoptKids(); render(); };
     return {
       mode:'db',
       async load(){
         kidsRef.onSnapshot(s => {
           if(s.exists){ const d=s.data(); if(Array.isArray(d.names) && d.names.length) kids=d.names.slice(); }
-          adoptKids(); render();
+          loaded(1);
         }, () => {});
         col.onSnapshot(qs => {
           entries = qs.docs.map(d => Object.assign({id:d.id}, d.data()));
-          adoptKids(); render();
+          loaded(2);
         }, () => { $('status').textContent = 'Lost connection to saved data. Reload to try again.'; });
       },
       async saveKids(){ await kidsRef.set({names:kids}); },
@@ -269,6 +302,9 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 
   // ---------- render ----------
   function render(){
+    $('share').hidden = gate!=='share'; $('kids').hidden = !!gate;
+    if(gate){ $('first').hidden = true; $('main').hidden = true; return; }
+
     // kid chips
     const k = $('kids'); k.textContent='';
     kids.forEach(name => {
@@ -420,14 +456,107 @@ dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   let tt;
   function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
 
+  // ---------- shared ledger (Firebase) ----------
+  // Each family ledger lives under a long random code; knowing the code is what grants access.
+  const CODE_KEY = 'kids-ledger-code';
+  const FB = 'https://www.gstatic.com/firebasejs/10.14.1/';
+  const cleanCode = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const prettyCode = c => c.match(/.{1,4}/g).join('-');
+  const newCode = () => { const abc='abcdefghjkmnpqrstuvwxyz23456789'; return Array.from(crypto.getRandomValues(new Uint8Array(24)), n => abc[n%abc.length]).join(''); };
+  const withTimeout = (p, ms=15000) => Promise.race([p, new Promise((_,no) => setTimeout(() => no(new Error('timeout')), ms))]);
+  const loadScript = src => new Promise((ok,no) => { const el=document.createElement('script'); el.src=src; el.onload=ok; el.onerror=no; document.head.appendChild(el); });
+  const OFFLINE = 'Could not reach the shared ledger. Check your connection and try again.';
+
+  let fs = null, code = '';
+  async function connect(){
+    await loadScript(FB+'firebase-app-compat.js');
+    await loadScript(FB+'firebase-firestore-compat.js');
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    fs = firebase.firestore();
+  }
+  function ledgerRefs(c){ const root = fs.collection('ledgers').doc(c); return [root.collection('ledger').doc('kids'), root.collection('entries')]; }
+  function openLedger(c){
+    code = c; try{ localStorage.setItem(CODE_KEY, c); }catch(e){}
+    gate = 'loading'; render();
+    store = dbAdapter(...ledgerRefs(c));
+    $('status').textContent = 'Shared ledger — updates live on every phone that has the family code.';
+    $('codeBtn').hidden = false;
+    return store.load();
+  }
+  function openCodeDlg(){ $('codeText').textContent = prettyCode(code); $('codeDlg').showModal(); }
+
+  let sharing = false;
+  function setSharing(on){ sharing=on; $('shareNew').disabled=on; $('shareJoin').disabled=on; }
+  $('shareNew').onclick = async () => {
+    if(sharing) return;
+    $('shareErr').textContent=''; setSharing(true);
+    try{
+      const c = newCode(), [kidsRef, col] = ledgerRefs(c);
+      let local = {};   // bring along anything already saved on this phone
+      try{ local = JSON.parse(localStorage.getItem(LS_KEY)) || {}; }catch(e){}
+      const batch = fs.batch();
+      batch.set(kidsRef, {names: local.kids || []});
+      for(const {id, ...body} of (local.entries || [])) batch.set(col.doc(id), body);
+      await withTimeout(batch.commit());
+      await openLedger(c); openCodeDlg();
+    }catch(err){ $('shareErr').textContent = OFFLINE; }
+    setSharing(false);
+  };
+  async function join(raw){
+    if(sharing) return;
+    const c = cleanCode(raw);
+    $('shareErr').textContent='';
+    if(c.length < 20){ $('shareErr').textContent='That looks too short. Paste the whole family code.'; $('shareCode').focus(); return; }
+    setSharing(true);
+    try{
+      const s = await withTimeout(ledgerRefs(c)[0].get());
+      if(s.exists) await openLedger(c);
+      else $('shareErr').textContent='No ledger matches that code. Check it and try again.';
+    }catch(err){ $('shareErr').textContent = OFFLINE; }
+    setSharing(false);
+  }
+  $('shareJoin').onclick = () => join($('shareCode').value);
+  $('shareCode').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); join($('shareCode').value); } });
+
+  $('codeBtn').onclick = openCodeDlg;
+  $('codeClose').onclick = () => $('codeDlg').close();
+  $('codeShare').onclick = async () => {
+    const link = location.origin + location.pathname + '#join=' + code;
+    const text = `Kids' Ledger family code: ${prettyCode(code)}\nOpen ${link} or paste the code into the app.`;
+    try{
+      if(navigator.share) await navigator.share({text});
+      else { await navigator.clipboard.writeText(text); toast('Code copied'); }
+    }catch(err){ if(err.name!=='AbortError') toast('Could not share. Copy the code instead.'); }
+  };
+  $('codeLeave').onclick = () => {
+    const b = $('codeLeave');
+    if(!b.classList.contains('armed')){
+      b.classList.add('armed'); b.textContent='Tap again to leave';
+      setTimeout(() => { b.classList.remove('armed'); b.textContent='Leave on this phone'; }, 3000);
+      return;
+    }
+    try{ localStorage.removeItem(CODE_KEY); }catch(e){}
+    location.reload();
+  };
+
   // ---------- boot ----------
   render();
   (async () => {
     let db = null;
     try{ if(window.claude && window.claude.use) db = await window.claude.use('db'); }catch(e){ db=null; }
     if(db){
-      store = dbAdapter(db);
+      store = dbAdapter(db.doc('ledger/kids'), db.collection('entries'));
       $('status').textContent = 'Saved to your account — synced on every device.';
+    } else if(window.FIREBASE_CONFIG){
+      try{ await connect(); }
+      catch(err){ $('status').textContent = 'Could not reach the shared ledger. Check your connection and reopen the app.'; return; }
+      let saved = ''; try{ saved = localStorage.getItem(CODE_KEY) || ''; }catch(e){}
+      const m = location.hash.match(/join=([\w-]+)/);
+      if(m) history.replaceState(null, '', location.pathname);
+      if(saved){ await openLedger(saved); return; }
+      gate = 'share'; $('status').textContent = ''; render();
+      if(m){ $('shareCode').value = m[1]; join(m[1]); }
+      return;
     } else {
       store = localAdapter();
       $('status').textContent = 'Saved on this device only.';

@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // A family ledger is reachable only by its long random code. The ledger's own
+    // document is never readable, so codes cannot be listed or guessed from outside.
+    match /ledgers/{code}/{sub}/{doc} {
+      allow read, write: if code.size() >= 20 && (sub == 'entries' || sub == 'ledger');
+    }
+  }
+}
