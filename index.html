@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kids' Ledger</title>
+<meta name="description" content="Track what the kids buy and what they owe back.">
+<meta name="theme-color" content="#F3F6F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1A1A" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kids' Ledger">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F3F6F5; --panel:#FFFFFF; --ink:#12302F; --muted:#5E7472; --line:#D8E1DF;
+  --sea:#0B6E8A; --owe:#B3261E; --own:#2F7D5B; --chip:#E6EEEC;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1A1A; --panel:#142526; --ink:#E4EFEC; --muted:#93A9A6; --line:#29403F;
+    --sea:#4FB8D6; --owe:#FF8A80; --own:#6FCF9F; --chip:#1D3333;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1A1A; --panel:#142526; --ink:#E4EFEC; --muted:#93A9A6; --line:#29403F;
+  --sea:#4FB8D6; --owe:#FF8A80; --own:#6FCF9F; --chip:#1D3333;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:1.05rem;font-weight:600;margin:4px 0 14px;color:var(--muted)}
+.kids{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.kid{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-weight:600;
+  padding:8px 16px;border-radius:999px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.kid .b{font-weight:400;color:var(--muted);font-size:.85rem}
+.kid[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.kid[aria-pressed="true"] .b{color:var(--bg);opacity:.75}
+.kid.add{color:var(--sea);border-style:dashed}
+.balance{margin:22px 0 18px}
+.balance .who{font-size:1.1rem;color:var(--muted)}
+.balance .amt{font-size:clamp(3rem,14vw,4.6rem);font-weight:800;line-height:1;letter-spacing:-.02em;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.balance .amt.zero{color:var(--own)}
+.balance .amt.pos{color:var(--owe)}
+.balance .sub{color:var(--muted);font-size:.92rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px}
+.card h2{font-size:1rem;margin:0 0 12px;font-weight:600}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number],input[type=date]{width:100%;font:inherit;color:var(--ink);background:var(--bg);
+  border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+input:focus-visible,button:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{font:inherit;border:0;background:transparent;color:var(--ink);padding:10px 8px;cursor:pointer;line-height:1.2}
+.seg button small{display:block;color:var(--muted);font-size:.78rem}
+.seg button[aria-pressed="true"].own{background:var(--own);color:#fff}
+.seg button[aria-pressed="true"].dad{background:var(--owe);color:#fff}
+.seg button[aria-pressed="true"] small{color:#fff;opacity:.85}
+.primary{width:100%;margin-top:14px;font:inherit;font-weight:600;border:0;border-radius:12px;padding:12px;
+  background:var(--sea);color:#fff;cursor:pointer}
+.primary:disabled{opacity:.45;cursor:default}
+.ghost{font:inherit;background:transparent;border:1.5px solid var(--line);color:var(--ink);border-radius:12px;padding:10px 14px;cursor:pointer}
+select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 12px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:32px}
+.payrow{display:flex;gap:8px;margin-top:10px}
+.payrow input{flex:1}
+.payrow .primary{width:auto;margin:0;padding:10px 16px;background:var(--own)}
+.err{color:var(--owe);font-size:.88rem;margin-top:8px;min-height:1em}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.list li:first-child{border-top:0}
+.item{min-width:0}
+.item .n{font-weight:600;overflow-wrap:anywhere}
+.item .m{font-size:.8rem;color:var(--muted)}
+.tag{font-size:.72rem;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted);margin-left:6px;font-weight:400}
+.tag.dad{color:var(--owe)}
+.tag.own{color:var(--own)}
+.tag.pay{color:var(--own)}
+.v{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.v.owe{color:var(--owe)}
+.v.pay{color:var(--own)}
+.x{border:0;background:transparent;color:var(--muted);font:inherit;font-size:1.1rem;cursor:pointer;padding:6px 10px;border-radius:8px;min-width:44px;min-height:44px}
+.x.armed{background:var(--owe);color:#fff;font-size:.85rem;font-weight:600}
+.empty{color:var(--muted);font-size:.92rem;margin:0}
+.totals{display:flex;gap:18px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);margin-bottom:10px}
+.totals b{color:var(--ink);font-variant-numeric:tabular-nums}
+.status{font-size:.8rem;color:var(--muted);margin-top:8px;text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:.92rem;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);padding:18px;max-width:340px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kids' ledger</h1>
+  <div class="kids" id="kids" role="group" aria-label="Choose a kid"></div>
+
+  <section class="card" id="first" style="margin-top:18px" hidden>
+    <h2>Start your ledger</h2>
+    <p class="empty">Add each kid you want to track. You can add more later.</p>
+    <button class="primary" id="firstBtn">Add a kid</button>
+  </section>
+
+  <div id="main">
+  <section class="balance" aria-live="polite">
+    <div class="who" id="who"></div>
+    <div class="amt" id="amt">$0.00</div>
+    <div class="sub" id="sub"></div>
+  </section>
+
+  <section class="card">
+    <h2>Add a purchase</h2>
+    <label for="item">What did they buy?</label>
+    <input id="item" type="text" placeholder="e.g. Roblox gift card" autocomplete="off">
+    <div class="row">
+      <div><label for="amount">Amount ($)</label><input id="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label for="date">Date</label><input id="date" type="date"></div>
+    </div>
+    <div class="seg" role="group" aria-label="Who paid">
+      <button type="button" class="own" id="payOwn" aria-pressed="true">Their money<small>Nothing owed</small></button>
+      <button type="button" class="dad" id="payDad" aria-pressed="false">I paid<small>They owe me back</small></button>
+    </div>
+    <button class="primary" id="addBtn">Add purchase</button>
+    <div class="err" id="addErr"></div>
+  </section>
+
+  <section class="card">
+    <h2>Record a payback</h2>
+    <label for="payFor">Paying back for</label>
+    <select id="payFor"></select>
+    <div class="payrow">
+      <input id="payAmt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount paid back" aria-label="Amount paid back">
+      <button class="primary" id="payBtn">Record</button>
+    </div>
+    <div class="err" id="payErr"></div>
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    <div class="totals" id="totals"></div>
+    <ul class="list" id="list"></ul>
+  </section>
+  </div>
+
+  <div class="status" id="status">Loading…</div>
+</div>
+
+<dialog id="kidDlg">
+  <label for="kidName">Kid's name</label>
+  <input id="kidName" type="text" autocomplete="off">
+  <div class="btns">
+    <button class="ghost" id="kidCancel">Cancel</button>
+    <button class="primary" style="width:auto;margin:0;padding:10px 16px" id="kidSave">Add kid</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n<0?'-':'') + '$' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const DEFAULT_KIDS = [];   // names are added in the app, never hard-coded
+
+  let kids = DEFAULT_KIDS.slice();
+  let entries = [];          // {id, kid, type:'buy'|'pay', item, amount, paidBy:'own'|'dad', date, createdAt}
+  let current = kids[0];
+  let paidBy = 'own';
+  let store = null;          // backend adapter
+
+  // ---------- storage adapters ----------
+  const LS_KEY = 'kids-ledger-v1';
+  function localAdapter(){
+    return {
+      mode:'local',
+      async load(){
+        try{ const raw = localStorage.getItem(LS_KEY); if(raw){ const d=JSON.parse(raw); kids=d.kids||kids; entries=d.entries||[]; } }catch(e){}
+        adoptKids(); render();
+      },
+      async saveKids(){ persistLocal(); },
+      async addEntry(e){ entries.push(e); persistLocal(); render(); },
+      async removeEntry(id){ entries = entries.filter(x=>x.id!==id); persistLocal(); render(); }
+    };
+    function persistLocal(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({kids,entries})); }catch(e){} }
+  }
+
+  function dbAdapter(db){
+    const kidsRef = db.doc('ledger/kids');
+    const col = db.collection('entries');
+    return {
+      mode:'db',
+      async load(){
+        kidsRef.onSnapshot(s => {
+          if(s.exists){ const d=s.data(); if(Array.isArray(d.names) && d.names.length) kids=d.names.slice(); }
+          adoptKids(); render();
+        }, () => {});
+        col.onSnapshot(qs => {
+          entries = qs.docs.map(d => Object.assign({id:d.id}, d.data()));
+          adoptKids(); render();
+        }, () => { $('status').textContent = 'Lost connection to saved data. Reload to try again.'; });
+      },
+      async saveKids(){ await kidsRef.set({names:kids}); },
+      async addEntry(e){ const {id, ...body} = e; await col.doc(id).set(body); },
+      async removeEntry(id){ await col.doc(id).delete(); }
+    };
+  }
+
+  // any kid who has entries stays on the list, and the selected kid always exists
+  function adoptKids(){
+    for(const e of entries) if(e.kid && !kids.includes(e.kid)) kids.push(e.kid);
+    if(!kids.includes(current)) current = kids[0];
+  }
+
+  // ---------- math ----------
+  function remaining(p){
+    let r = p.amount;
+    for(const e of entries) if(e.type==='pay' && e.forId===p.id) r -= e.amount;
+    return Math.round(r*100)/100;
+  }
+  const shortDate = d => d ? new Date(d+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
+  let payKid = null;
+  function fillPayFor(){
+    const sel = $('payFor'), prev = sel.value, kidChanged = payKid!==current;
+    const open = entries.filter(e=>e.kid===current && e.type!=='pay' && e.paidBy==='dad' && remaining(e)>0.004)
+      .sort((a,b)=>(a.date||'').localeCompare(b.date||'') || (a.createdAt||0)-(b.createdAt||0));
+    sel.textContent='';
+    for(const p of open){
+      const o=document.createElement('option'); o.value=p.id;
+      o.textContent=`${p.item} — ${fmt(remaining(p))} left (${shortDate(p.date)})`;
+      sel.appendChild(o);
+    }
+    const g=document.createElement('option'); g.value=''; g.textContent='Not tied to a purchase'; sel.appendChild(g);
+    if(!kidChanged && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+    else { sel.value = open.length ? open[0].id : ''; if(kidChanged) prefillPay(); }
+    payKid = current;
+  }
+  function prefillPay(){
+    const p = entries.find(e=>e.id===$('payFor').value);
+    $('payAmt').value = p ? remaining(p).toFixed(2) : '';
+    $('payErr').textContent='';
+  }
+
+  function stats(kid){
+    let owed=0, paid=0, own=0, dad=0;
+    for(const e of entries){
+      if(e.kid!==kid) continue;
+      if(e.type==='pay'){ paid+=e.amount; }
+      else if(e.paidBy==='dad'){ dad+=e.amount; }
+      else { own+=e.amount; }
+    }
+    owed = Math.round((dad - paid)*100)/100;
+    return {owed, paid, own, dad, spent: own+dad};
+  }
+
+  // ---------- render ----------
+  function render(){
+    // kid chips
+    const k = $('kids'); k.textContent='';
+    kids.forEach(name => {
+      const b = document.createElement('button');
+      b.className='kid'; b.type='button';
+      b.setAttribute('aria-pressed', String(name===current));
+      const s = stats(name);
+      const t = document.createElement('span'); t.textContent = name;
+      const v = document.createElement('span'); v.className='b'; v.textContent = s.owed>0 ? 'owes '+fmt(s.owed) : 'all square';
+      b.append(t, v);
+      b.onclick = () => { current=name; render(); };
+      k.appendChild(b);
+    });
+    const add = document.createElement('button');
+    add.className='kid add'; add.type='button'; add.textContent='+ Add kid';
+    add.onclick = openKidDlg;
+    k.appendChild(add);
+
+    const none = !kids.length;
+    $('first').hidden = !none; $('main').hidden = none;
+    if(none) return;
+
+    // balance
+    const s = stats(current);
+    $('who').textContent = s.owed>0 ? current+' owes you' : (s.owed<0 ? 'You owe '+current : current+' is all square');
+    $('amt').textContent = fmt(Math.abs(s.owed));
+    $('amt').className = 'amt ' + (s.owed>0 ? 'pos' : 'zero');
+    $('sub').textContent = s.owed<0 ? 'They paid back more than they owed.' :
+      `${fmt(s.dad)} you covered, ${fmt(s.paid)} paid back so far`;
+
+    $('totals').innerHTML = '';
+    const t1 = document.createElement('span'); t1.innerHTML = 'Total spent <b></b>'; t1.querySelector('b').textContent = fmt(s.spent);
+    const t2 = document.createElement('span'); t2.innerHTML = 'Their money <b></b>'; t2.querySelector('b').textContent = fmt(s.own);
+    const t3 = document.createElement('span'); t3.innerHTML = 'You covered <b></b>'; t3.querySelector('b').textContent = fmt(s.dad);
+    $('totals').append(t1,t2,t3);
+
+    fillPayFor();
+
+    // list
+    const list = $('list'); list.textContent='';
+    const mine = entries.filter(e=>e.kid===current)
+      .sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
+    if(!mine.length){
+      const p = document.createElement('p'); p.className='empty';
+      p.textContent = `No purchases for ${current} yet. Add the first one above.`;
+      list.appendChild(p);
+    }
+    for(const e of mine){
+      const li = document.createElement('li');
+      const left = document.createElement('div'); left.className='item';
+      const n = document.createElement('div'); n.className='n';
+      const tag = document.createElement('span');
+      if(e.type==='pay'){
+        const p = e.forId && entries.find(x=>x.id===e.forId);
+        n.textContent = p ? 'Paid back: '+p.item : 'Paid you back';
+        tag.className='tag pay'; tag.textContent='payback';
+      } else if(e.paidBy==='dad'){
+        n.textContent=e.item; const r=remaining(e);
+        if(r<=0.004){ tag.className='tag own'; tag.textContent='paid off'; }
+        else if(r<e.amount){ tag.className='tag dad'; tag.textContent=fmt(r)+' left'; }
+        else { tag.className='tag dad'; tag.textContent='you paid'; }
+      } else { n.textContent=e.item; tag.className='tag own'; tag.textContent='own money'; }
+      n.appendChild(tag);
+      const m = document.createElement('div'); m.className='m';
+      m.textContent = e.date ? new Date(e.date+'T12:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '';
+      left.append(n,m);
+      const v = document.createElement('div');
+      v.className = 'v ' + (e.type==='pay' ? 'pay' : (e.paidBy==='dad' ? 'owe' : ''));
+      v.textContent = (e.type==='pay' ? '−' : '') + fmt(e.amount);
+      const x = document.createElement('button'); x.className='x'; x.type='button'; x.textContent='×';
+      x.setAttribute('aria-label','Delete '+(e.type==='pay'?'payback':e.item));
+      x.onclick = async () => {
+        if(!store) return;
+        if(!x.classList.contains('armed')){
+          x.classList.add('armed'); x.textContent='Delete';
+          setTimeout(() => { x.classList.remove('armed'); x.textContent='×'; }, 3000);
+          return;
+        }
+        x.disabled = true; li.style.opacity = '.4';
+        try{ await store.removeEntry(e.id); toast('Deleted'); }
+        catch(err){ li.style.opacity = ''; x.disabled = false; toast('Could not delete. Try again.'); }
+      };
+      li.append(left, v, x);
+      list.appendChild(li);
+    }
+  }
+
+  // ---------- actions ----------
+  function setPaidBy(v){
+    paidBy=v;
+    $('payOwn').setAttribute('aria-pressed', String(v==='own'));
+    $('payDad').setAttribute('aria-pressed', String(v==='dad'));
+  }
+  $('payFor').onchange = prefillPay;
+  $('payOwn').onclick = () => setPaidBy('own');
+  $('payDad').onclick = () => setPaidBy('dad');
+  $('date').value = today();
+
+  let busy=false;
+  $('addBtn').onclick = async () => {
+    if(!store){ toast('Still loading, one sec…'); return; }
+    if(busy) return;
+    const item = $('item').value.trim();
+    const amount = Math.round(parseFloat($('amount').value)*100)/100;
+    $('addErr').textContent='';
+    if(!item){ $('addErr').textContent='Enter what they bought.'; $('item').focus(); return; }
+    if(!(amount>0)){ $('addErr').textContent='Enter an amount above $0.'; $('amount').focus(); return; }
+    busy=true; $('addBtn').disabled=true;
+    try{
+      await store.addEntry({id:uid(), kid:current, type:'buy', item, amount, paidBy, date:$('date').value||today(), createdAt:Date.now()});
+      $('item').value=''; $('amount').value='';
+      toast(paidBy==='dad' ? `Added. ${current} owes you ${fmt(amount)} more.` : 'Purchase added');
+    }catch(err){ $('addErr').textContent='Could not save. Check your connection and try again.'; }
+    busy=false; $('addBtn').disabled=false;
+  };
+
+  $('payBtn').onclick = async () => {
+    if(!store){ toast('Still loading, one sec…'); return; }
+    if(busy) return;
+    const amount = Math.round(parseFloat($('payAmt').value)*100)/100;
+    $('payErr').textContent='';
+    if(!(amount>0)){ $('payErr').textContent='Enter the amount they paid back.'; $('payAmt').focus(); return; }
+    const forId = $('payFor').value;
+    const p = forId && entries.find(e=>e.id===forId);
+    if(p && amount > remaining(p)+0.004){ $('payErr').textContent=`Only ${fmt(remaining(p))} is left on ${p.item}.`; $('payAmt').focus(); return; }
+    const left = p ? Math.round((remaining(p)-amount)*100)/100 : 0;
+    busy=true; $('payBtn').disabled=true;
+    try{
+      await store.addEntry({id:uid(), kid:current, type:'pay', item: p ? 'Payback: '+p.item : 'Payback', forId: p ? p.id : '', amount, paidBy:'', date:today(), createdAt:Date.now()});
+      payKid = null; render();   // re-pick the next open purchase
+      toast(p ? (left<=0.004 ? `${p.item} is paid off` : `${fmt(amount)} toward ${p.item}, ${fmt(left)} left`) : `Recorded ${fmt(amount)} from ${current}`);
+    }catch(err){ $('payErr').textContent='Could not save. Check your connection and try again.'; }
+    busy=false; $('payBtn').disabled=false;
+  };
+
+  function openKidDlg(){ $('kidName').value=''; $('kidDlg').showModal(); $('kidName').focus(); }
+  $('firstBtn').onclick = openKidDlg;
+  $('kidCancel').onclick = () => $('kidDlg').close();
+  $('kidSave').onclick = async () => {
+    const name = $('kidName').value.trim();
+    if(!name) return;
+    if(!kids.some(k=>k.toLowerCase()===name.toLowerCase())) kids.push(name);
+    current = kids.find(k=>k.toLowerCase()===name.toLowerCase());
+    $('kidDlg').close(); render();
+    try{ if(store) await store.saveKids(); }catch(e){ toast('Could not save the new kid.'); }
+  };
+  $('kidName').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); $('kidSave').click(); } });
+
+  let tt;
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+  // ---------- boot ----------
+  render();
+  (async () => {
+    let db = null;
+    try{ if(window.claude && window.claude.use) db = await window.claude.use('db'); }catch(e){ db=null; }
+    if(db){
+      store = dbAdapter(db);
+      $('status').textContent = 'Saved to your account — synced on every device.';
+    } else {
+      store = localAdapter();
+      $('status').textContent = 'Saved on this device only.';
+    }
+    await store.load();
+  })();
+})();
+</script>
+</body>
+</html>
